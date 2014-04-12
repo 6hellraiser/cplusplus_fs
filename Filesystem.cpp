@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include <string>
+#include <iostream>
 #ifndef FILE_H
 #define FILE_H
 #include "File.h"
@@ -13,12 +14,17 @@
 #include <vector>
 #include <fstream>
 #include <algorithm> 
+#include <windows.h>
 #include <shlwapi.h>
 #pragma comment (lib, "shlwapi")
 using namespace std;
 
+wstring root;
+
 filesystem::filesystem(wstring _current_path){
 	current_path = _current_path;
+	root = _current_path;
+	for_pwd = L"/";
 }
 
 wstring filesystem::getCurrenpPath() {
@@ -27,6 +33,14 @@ wstring filesystem::getCurrenpPath() {
 
 void filesystem::setCurrentPath(wstring path) {
 	current_path = path;
+}
+
+wstring filesystem::getPwd() {
+	return for_pwd;
+}
+
+void filesystem::setPwd(wstring _path) {
+	for_pwd = _path;
 }
 
 wstring filesystem::createPath(wstring param) {
@@ -166,8 +180,51 @@ void* filesystem::rmdir(vector<wstring> params) {
 	return nullptr;
 }
 
+int findlastentry(wstring word, wchar_t symbol) {
+	for (int i = word.length() - 1; i != 0; i--) {
+		if (word[i] == symbol)
+			return i;
+	}
+	throw ("There is no entry of such symbol");
+	return 6;
+}
+
 
 void* filesystem::cpdir(vector<wstring> params) {
+	//пройтись по фс, если есть вхождение, то включить в children
+	//вырезать имена, оставляя имя папки
+	wstring old_path = createPath(params[0]);
+	wstring new_path = createPath(params[1]);
+
+	vector<file*> children;
+	vector<wstring> temp_names;
+	wstring trimmed_name;
+	wstring name;
+	for (int i = 0; i < fs.size(); i++) {
+		name = fs[i]->getPath();
+		if (wcsstr(name.c_str(), old_path.c_str()) != nullptr) {
+			children.push_back(fs[i]);
+			//trimmed_name = name.substr(old_path-позиция посленего слеша в old_path); т.е. найти последнее вхождение слеша в олд_пас
+			trimmed_name = name.substr(findlastentry(old_path, '/')); //проверить, мать вашу!!
+			temp_names.push_back(trimmed_name);
+		}
+	}
+	//создать их физически
+	for (int i = 0; i < children.size(); i++) {
+		if (dynamic_cast<dir*>(children[i]) != nullptr) {
+			CreateDirectory((new_path + temp_names[i]).c_str(), NULL);
+		}
+		else {
+			ifstream src(children[i]->getPath());
+			ofstream dst((new_path + temp_names[i]).c_str());
+			dst << src.rdbuf();
+			src.close();
+			dst.close();
+		}
+	}
+	//занести новые файлы в фс
+	
+
 	return nullptr;
 }
 
@@ -199,11 +256,12 @@ void* filesystem::mvdir(vector<wstring> params) {
 	vector<file*> children;
 	vector<wstring> temp_names;
 	wstring name;
+	wstring trimmed_name;
 	for (int i = 0; i < fs.size(); i++) {
 		name = fs[i]->getPath();
 		if (wcsstr(name.c_str(), old_path.c_str()) != nullptr) {
-			children.push_back(fs[i]); //?
-			wstring trimmed_name = name.substr(old_path.length()); //вынести наружу: сейчас не могу, голова уже не соображает
+			children.push_back(fs[i]); //? один и тот же ли порядок 
+			trimmed_name = name.substr(old_path.length()); //вынести наружу: сейчас не могу, голова уже не соображает
 			temp_names.push_back(trimmed_name);
 		}
 	}
@@ -231,5 +289,83 @@ void* filesystem::mvdir(vector<wstring> params) {
 		fs[pos_change]->setPAth(new_path + temp_names[i]);
 	}
 	
+	return nullptr;
+}
+
+void* filesystem::pwd(vector<wstring> params) {
+	wprintf(L"%s\n", getPwd().c_str());
+	return nullptr;
+}
+
+void* filesystem::ls(vector<wstring> params) {
+	bool params_empty = params.empty();
+	wstring path;
+	if (!params_empty)
+		path = createPath(params[0]);
+	else
+		path = current_path;
+	vector<file*> children;
+	wstring name;
+	wstring trimmed_name;
+	vector<wstring> temp_names;
+
+	size_t slashes_in_path = count_slashes(path);
+	for (int i = 0; i < fs.size(); i++) {
+		name = fs[i]->getPath();
+		if (wcsstr(name.c_str(), path.c_str()) != nullptr && (count_slashes(name) == slashes_in_path + 1)) {
+			children.push_back(fs[i]); //? один и тот же ли порядок 
+			trimmed_name = name.substr(path.length() + 1); //вынести наружу: сейчас не могу, голова уже не соображает
+			temp_names.push_back(trimmed_name);
+		}
+	}
+	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+	for (int j = 0; j < children.size(); j++) {
+		if (dynamic_cast<dir*>(children[j]) != nullptr) {
+			SetConsoleTextAttribute(hConsole, (WORD)((0 << 4) | 3));
+		}
+		else {
+			SetConsoleTextAttribute(hConsole, (WORD)((0 << 4) | 7));
+		}
+		wprintf(L"%s\n", temp_names[j].c_str());
+	}
+	/*size_t counter = 0;
+	const size_t MAX_IN_ROW = 4;
+	for (int j = 0; j < temp_names.size(); j++) {
+		if (counter != MAX_IN_ROW) {
+			wprintf(L"%s   ", temp_names[j].c_str());
+			counter++;
+		}
+		else {
+			counter = 0;
+			wprintf(L"\n%s   ", temp_names[j].c_str());
+		}
+	}
+	wprintf(L"\n");*/
+	return nullptr;
+}
+
+void* filesystem::cd(vector<wstring> params) {
+	//путь из корня
+	//путь из текущей папки
+	//..
+	//../..
+	wstring command = params[0];
+	if (!wcscmp(command.c_str(), L"..") && wcscmp(current_path.c_str(), root.c_str())) {
+		int i = findlastentry(current_path, '/');
+		wstring temp = current_path.substr(0, i);
+		current_path = temp;
+		for_pwd = current_path.substr(root.length());
+		for_pwd += L"/";
+	}
+	else if (!wcscmp(command.c_str(), L"../..")) {
+		current_path = root;
+		for_pwd = L"/";
+	}
+	else {
+		wstring new_path = createPath(params[0]);
+		current_path = new_path;
+		for_pwd = current_path.substr(root.length());//=current path without root
+	}
+
 	return nullptr;
 }

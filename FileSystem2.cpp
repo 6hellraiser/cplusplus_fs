@@ -30,6 +30,9 @@ void associate() {
 	methods.insert(pair<wstring, void*(filesystem::*)(vector<wstring>)>(L"rmdir", &filesystem::rmdir));
 	methods.insert(pair<wstring, void*(filesystem::*)(vector<wstring>)>(L"cpdir", &filesystem::cpdir));
 	methods.insert(pair<wstring, void*(filesystem::*)(vector<wstring>)>(L"mvdir", &filesystem::mvdir));
+	methods.insert(pair<wstring, void*(filesystem::*)(vector<wstring>)>(L"pwd", &filesystem::pwd));
+	methods.insert(pair<wstring, void*(filesystem::*)(vector<wstring>)>(L"ls", &filesystem::ls));
+	methods.insert(pair<wstring, void*(filesystem::*)(vector<wstring>)>(L"cd", &filesystem::cd));
 }
 
 
@@ -100,7 +103,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	filesys = new filesystem(path);
 	wstring command;
 	while (true) {
-		wcout << ">>";
+		HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+		SetConsoleTextAttribute(hConsole, (WORD)((0 << 4) | 2));
+		wcout << filesys->getPwd().c_str();
+		SetConsoleTextAttribute(hConsole, (WORD)((0 << 4) | 15));
+		cout << ">>";
 		getline(wcin, command);
 		if (wcscmp(command.c_str(), L"exit"))
 			execute(command);

@@ -15,13 +15,18 @@ using namespace std;
 class filesystem {
 private:
 	wstring current_path; //полный путь
+	wstring for_pwd;
 	vector<file*> fs;
 	wstring createPath(wstring param);
 	
 public:
 	filesystem(wstring _current_path);
+
 	wstring getCurrenpPath();
 	void setCurrentPath(wstring _path);
+
+	wstring getPwd();
+	void setPwd(wstring _path);
 
 	void* mkdir(vector<wstring> params);
 	void* touch(vector<wstring> params);
@@ -32,4 +37,7 @@ public:
 	void* edit(vector<wstring> params);
 	void* rmdir(vector<wstring> params);
 	void* rm(vector<wstring> params);
+	void* pwd(vector<wstring> params);
+	void* ls(vector<wstring> params);
+	void* cd(vector<wstring> params);
 };
